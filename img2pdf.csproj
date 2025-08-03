@@ -8,7 +8,7 @@
 		<PackAsTool>true</PackAsTool>
 		<ToolCommandName>img2pdf</ToolCommandName>
 		<PackageId>Img2Pdf</PackageId>
-		<Version>1.0.3</Version>
+		<Version>1.0.4</Version>
 		<Authors>十六-泽楠</Authors>
 		<Description>一个将各种图片格式转换为PDF的命令行工具</Description>
 		<PackageTags>pdf;png;jpg;image;convert;tool</PackageTags>
@@ -19,7 +19,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="System.Drawing.Common" Version="6.0.0" />
+		<PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
 		<PackageReference Include="PDFsharp" Version="6.2.1" />
 		<None Include="README.md" Pack="true" PackagePath="\" />
 	</ItemGroup>

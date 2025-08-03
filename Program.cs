@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
-
 using System.Text;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Img2Pdf
 {
@@ -37,31 +38,10 @@ namespace Img2Pdf
                     return 0;
                 }
 
-                // 如果没有提供任何参数，询问用户是否要处理当前目录
+                // 如果没有提供任何参数，自动处理当前目录
                 if (args.Length == 0)
                 {
-                    Console.WriteLine("未提供参数。您想要：");
-                    Console.WriteLine("Y - 处理当前目录下的所有图片并创建PDF");
-                    Console.WriteLine("N - 显示帮助信息");
-                    Console.Write("请选择 (Y/N): ");
-                    
-                    var key = Console.ReadKey();
-                    Console.WriteLine(); // 换行
-                    
-                    if (key.Key == ConsoleKey.N)
-                    {
-                        ShowHelp();
-                        return 0;
-                    }
-                    else if (key.Key != ConsoleKey.Y)
-                    {
-                        Console.WriteLine("无效的选择，默认显示帮助信息。");
-                        ShowHelp();
-                        return 0;
-                    }
-                    
-                    // 用户选择了Y，继续处理当前目录
-                    Console.WriteLine("将处理当前目录下的所有图片...");
+                    Console.WriteLine("未提供参数，将自动处理当前目录下的所有图片...");
                 }
 
                 // 获取输入路径
@@ -297,8 +277,8 @@ namespace Img2Pdf
                         processedCount++;
                         Console.Write($"\r处理图片 {processedCount}/{totalCount}: {Path.GetFileName(imagePath)}");
 
-                        // 加载图片
-                        using (var img = System.Drawing.Image.FromFile(imagePath))
+                        // 使用跨平台的 ImageSharp 加载图片
+                        using (var imageSharpImg = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(imagePath))
                         {
                             // 创建PDF页面
                             PdfPage page;
@@ -307,8 +287,8 @@ namespace Img2Pdf
                             {
                                 // 使用图片的原始尺寸
                                 page = document.AddPage();
-                                page.Width = img.Width;
-                                page.Height = img.Height;
+                                page.Width = imageSharpImg.Width;
+                                page.Height = imageSharpImg.Height;
                             }
                             else
                             {
@@ -319,12 +299,13 @@ namespace Img2Pdf
                             // 在页面上绘制图片
                             using (XGraphics gfx = XGraphics.FromPdfPage(page))
                             {
+                                // 仍然使用 XImage 从文件加载，因为 PdfSharp 需要它
                                 using (XImage xImg = XImage.FromFile(imagePath))
                                 {
                                     if (keepOriginalSize)
                                     {
                                         // 以原始尺寸绘制
-                                        gfx.DrawImage(xImg, 0, 0, img.Width, img.Height);
+                                        gfx.DrawImage(xImg, 0, 0, imageSharpImg.Width, imageSharpImg.Height);
                                     }
                                     else
                                     {
@@ -357,8 +338,26 @@ namespace Img2Pdf
 
                 Console.WriteLine(); // 换行，结束进度显示
 
-                // 保存PDF文档
-                document.Save(outputPath);
+                // 保存PDF文档，如果文件被占用则尝试使用新的文件名
+                try
+                {
+                    document.Save(outputPath);
+                }
+                catch (IOException ex) when ((ex.HResult & 0x0000FFFF) == 32) // 文件被占用的错误码
+                {
+                    // 生成一个带时间戳的新文件名
+                    string directory = Path.GetDirectoryName(outputPath);
+                    string fileNameWithoutExt = Path.GetFileNameWithoutExtension(outputPath);
+                    string extension = Path.GetExtension(outputPath);
+                    string timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+                    string newOutputPath = Path.Combine(
+                        directory ?? "",
+                        $"{fileNameWithoutExt}_{timestamp}{extension}");
+                    
+                    Console.WriteLine($"原文件被占用，将保存到新文件: {newOutputPath}");
+                    document.Save(newOutputPath);
+                    outputPath = newOutputPath; // 更新输出路径以便后续使用
+                }
             }
         }
 
